@@ -3,12 +3,13 @@
 # the host (deploy.sh does this over SSH). Live sessions survive the restart.
 set -euo pipefail
 cd /opt/draftmancer
-BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+# The checkout belongs to the app user; run everything in it as that user.
 run() { runuser -u draftmancer -- env PUPPETEER_SKIP_DOWNLOAD=true HUSKY=0 "$@"; }
+BRANCH="$(run git rev-parse --abbrev-ref HEAD)"
 
 run git fetch -q origin "$BRANCH"
 run git reset -q --hard "origin/$BRANCH"
-echo "==> $(git log --oneline -1)"
+echo "==> $(run git log --oneline -1)"
 run npm ci --no-audit --no-fund --loglevel=error
 run npm run -s build-server
 run npm run -s build-client >/dev/null
