@@ -1,18 +1,17 @@
-// Keeps a self-hosted Draftmancer up on Windows: runs the built server and a
-// Cloudflare Tunnel connector side by side, restarting either one when it exits.
+// Keeps a self-hosted Draftmancer up on Windows: runs the built server and
+// restarts it whenever it exits. Public traffic reaches it through Tailscale
+// Funnel (port 8443) and the Cloudflare Worker in deploy/cloudflare/.
 //
 //   node deploy/windows/supervise.mjs
 //
-// Expects, at the repo root:
-//   .env                 PORT / NODE_ENV / SECRET_KEY (read by the server via --env-file)
-//   .cloudflared-token   tunnel run token (optional; no tunnel if missing)
+// Expects .env at the repo root (PORT / NODE_ENV / SECRET_KEY, read by the
+// server via --env-file).
 // Logs go to logs/. Started at logon by the "Draftmancer" scheduled task
 // (deploy/windows/install-task.ps1) through start-hidden.vbs.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,12 +43,6 @@ function openLog(name) {
 		// Missing file is fine.
 	}
 	return fs.openSync(file, "a");
-}
-
-function findCloudflared() {
-	if (process.env.CLOUDFLARED) return process.env.CLOUDFLARED;
-	const local = path.join(os.homedir(), "bin", "cloudflared.exe");
-	return fs.existsSync(local) ? local : "cloudflared";
 }
 
 const children = new Map();
@@ -96,10 +89,3 @@ keepAlive("server", process.execPath, [
 	"--max-old-space-size=4096",
 	".",
 ]);
-
-const tokenFile = path.join(root, ".cloudflared-token");
-if (fs.existsSync(tokenFile)) {
-	keepAlive("tunnel", findCloudflared(), ["tunnel", "--no-autoupdate", "run", "--token-file", tokenFile]);
-} else {
-	log("no .cloudflared-token; running without the tunnel");
-}

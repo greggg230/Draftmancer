@@ -1,5 +1,5 @@
-# Registers the "Draftmancer" scheduled task: starts the supervisor (server +
-# Cloudflare Tunnel) hidden at logon for the current user. No admin needed.
+# Registers the "Draftmancer" scheduled task: starts the supervisor (keeps the
+# server running) hidden at logon for the current user. No admin needed.
 #   powershell -NoProfile -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1
 $vbs = Join-Path $PSScriptRoot "start-hidden.vbs"
 $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbs`""

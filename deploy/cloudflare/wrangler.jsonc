@@ -1,0 +1,11 @@
+// Deploy from this directory: npx wrangler deploy
+{
+  "name": "draftmancer",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "routes": [{ "pattern": "draftmancer.greggg230.com", "custom_domain": true }],
+  "vars": {
+    // Tailscale Funnel on the desktop (see deploy/windows/).
+    "ORIGIN": "https://desktop-j05412i.tail5568ad.ts.net:8443"
+  }
+}
