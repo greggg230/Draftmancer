@@ -11,8 +11,9 @@ run git fetch -q origin "$BRANCH"
 run git reset -q --hard "origin/$BRANCH"
 echo "==> $(run git log --oneline -1)"
 run npm ci --no-audit --no-fund --loglevel=error
-run npm run -s build-server
-run npm run -s build-client >/dev/null
+# tsc needs more than Node's default ~2 GB heap on a 4 GB box (swap covers the rest).
+run env NODE_OPTIONS=--max-old-space-size=3072 npm run -s build-server
+run env NODE_OPTIONS=--max-old-space-size=3072 npm run -s build-client >/dev/null
 systemctl restart draftmancer
 
 for _ in $(seq 1 60); do
