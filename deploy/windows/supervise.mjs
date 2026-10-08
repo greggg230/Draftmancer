@@ -1,6 +1,6 @@
 // Keeps a self-hosted Draftmancer up on Windows: runs the built server and
-// restarts it whenever it exits. Public traffic reaches it through Tailscale
-// Funnel (port 8443) and the Cloudflare Worker in deploy/cloudflare/.
+// restarts it whenever it exits. Not the production host any more (that's
+// deploy/hetzner/); see deploy/README.md for how it was exposed.
 //
 //   node deploy/windows/supervise.mjs
 //
