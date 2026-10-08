@@ -26,6 +26,7 @@ import { IBracket, BracketType } from "../../src/Brackets";
 import { MinesweeperSyncData } from "@/MinesweeperDraftTypes";
 import { HousmanDraftSyncData } from "@/HousmanDraft";
 import { minesweeperApplyDiff } from "../../src/MinesweeperDraftTypes";
+import { diffCardPools } from "../../src/CardPoolSync";
 import Constants, { CubeDescription, EnglishBasicLandNames } from "../../src/Constants";
 import { CardColor, OptionalOnPickDraftEffect, UsableDraftEffect, OnPickDraftEffect } from "../../src/CardTypes";
 import { SolomonDraftSyncData } from "@/SolomonDraft";
@@ -1320,6 +1321,43 @@ export default defineComponent({
 
 			this.socket.on("botRecommandations", (data) => {
 				if (data.pickNumber === this.draftState?.pickNumber) this.botScores = data.scores;
+			});
+
+			// Sent when picking is over: the server's copy of our card pool is authoritative, ours was built
+			// optimistically pick by pick and may have drifted (see Session.syncCardPools).
+			this.socket.on("syncCardPool", (pool) => {
+				if (this.gameState === GameState.Watching) return;
+				const { missing, extra } = diffCardPools({ main: this.deck, side: this.sideboard }, pool);
+				const recovered = [...missing.main, ...missing.side];
+				if (recovered.length === 0 && extra.length === 0) return;
+
+				console.warn("Card pool out of sync with the server.", { recovered, extra });
+				for (const card of extra) {
+					let index = this.deck.findIndex((c) => c.uniqueID === card.uniqueID);
+					if (index >= 0) {
+						this.deckDisplay?.remCard(this.deck[index]);
+						this.deck.splice(index, 1);
+						continue;
+					}
+					index = this.sideboard.findIndex((c) => c.uniqueID === card.uniqueID);
+					if (index >= 0) {
+						this.sideboardDisplay?.remCard(this.sideboard[index]);
+						this.sideboard.splice(index, 1);
+					}
+				}
+				this.addToDeck(missing.main);
+				this.addToSideboard(missing.side);
+
+				const list = (cards: UniqueCard[]) =>
+					`<ul>${cards.map((c) => `<li>${escapeHTML(c.name)}</li>`).join("")}</ul>`;
+				Alert.fire({
+					icon: "warning",
+					title: "Card pool re-synced",
+					html:
+						"Your card pool didn't match the server's record of your picks, so it was corrected." +
+						(recovered.length > 0 ? `<br />Recovered:${list(recovered)}` : "") +
+						(extra.length > 0 ? `Removed (not actually yours):${list(extra)}` : ""),
+				});
 			});
 
 			this.socket.on("endDraft", () => {

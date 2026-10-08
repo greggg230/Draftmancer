@@ -14,6 +14,7 @@ import {
 } from "./src/common.js";
 import { RochesterDraftSyncData } from "../src/RochesterDraft.js";
 import { SocketAck } from "../src/Message.js";
+import { UniqueCardID } from "../src/CardTypes.js";
 
 describe("Rochester Draft", function () {
 	let clients: ReturnType<typeof makeClients> = [];
@@ -105,30 +106,39 @@ describe("Rochester Draft", function () {
 	const endDraft = () => {
 		it("Every player randomly chooses a card and the draft should end.", function (done) {
 			let draftEnded = 0;
+			let poolsSynced = 0;
+			const picked: UniqueCardID[][] = clients.map(() => []);
+			const finish = () => {
+				if (draftEnded === clients.length && poolsSynced === clients.length) done();
+			};
 
 			for (let c = 0; c < clients.length; ++c) {
 				// Pick randomly and retry on error
 				const pick = (state: RochesterDraftSyncData) => {
 					const cl = clients[c];
-					cl.emit(
-						"rochesterDraftPick",
-						[Math.floor(Math.random() * state.booster.length)],
-						(response: SocketAck) => {
-							if (response.code !== 0) pick(state);
-						}
-					);
+					const idx = Math.floor(Math.random() * state.booster.length);
+					cl.emit("rochesterDraftPick", [idx], (response: SocketAck) => {
+						if (response.code !== 0) pick(state);
+						else picked[c].push(state.booster[idx].uniqueID);
+					});
 				};
 				clients[c].on("rochesterDraftNextRound", function (state) {
 					if (state.currentPlayer === (clients[c] as any).query.userID) pick(state);
 				});
+				clients[c].once("syncCardPool", (pool) => {
+					expect(pool.main.map((card) => card.uniqueID)).to.include.members(picked[c]);
+					poolsSynced += 1;
+					finish();
+				});
 				clients[c].once("rochesterDraftEnd", function () {
 					draftEnded += 1;
 					clients[c].removeListener("rochesterDraftNextRound");
-					if (draftEnded == clients.length) done();
+					finish();
 				});
 			}
 			// Pick the first card
 			const currPlayer = clients.findIndex((c) => getUID(c) === rochesterDraftState!.currentPlayer);
+			picked[currPlayer].push(rochesterDraftState!.booster[0].uniqueID);
 			clients[currPlayer].emit("rochesterDraftPick", [0], ackNoError);
 		});
 	};

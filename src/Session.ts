@@ -1446,6 +1446,7 @@ export class Session implements IIndexable {
 		if (!this.drafting || !isRochesterDraftState(s)) return;
 		logSession("RochesterDraft", this);
 		for (const uid of this.users) Connections[uid].socket.emit("rochesterDraftEnd");
+		this.syncCardPools(this.users);
 		this.finalizeLogs();
 		this.sendLogs();
 		this.cleanDraftState();
@@ -2866,6 +2867,17 @@ export class Session implements IIndexable {
 		return false;
 	}
 
+	// Clients add picks to their card pool before the server confirms them and only resync on
+	// reconnection, so a pick racing a reconnection can end up missing (or extra) on the client,
+	// and so in the decks players export. Send the authoritative pools once picking is over, after the
+	// end-of-draft event: the client may show a notice, and its "Done drafting!" toast would replace it.
+	syncCardPools(userIDs: Iterable<UserID>) {
+		for (const uid of userIDs) {
+			const connection = Connections[uid];
+			connection?.socket.emit("syncCardPool", connection.pickedCards);
+		}
+	}
+
 	endDraft() {
 		const s = this.draftState;
 		if (!isDraftState(s)) return;
@@ -2897,6 +2909,7 @@ export class Session implements IIndexable {
 			this.cleanDraftState();
 
 			this.emitToConnectedUsers("endDraft");
+			this.syncCardPools(Object.keys(s.players).filter((uid) => !s.players[uid].isBot));
 			console.log(`Session ${this.id} draft ended.`);
 		});
 	}
