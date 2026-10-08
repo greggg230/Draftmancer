@@ -148,6 +148,7 @@ export interface ServerToClientEvents {
 	"draftState:boosterCount": (boosterCount: number) => void;
 	startReviewPhase: (timer: number) => void;
 	endDraft: () => void;
+	syncCardPool: (pool: { main: UniqueCard[]; side: UniqueCard[] }) => void;
 	pauseDraft: () => void;
 	resumeDraft: () => void;
 	rejoinDraft: (data: {

@@ -593,6 +593,57 @@ describe("Single Player Draft", function () {
 	});
 });
 
+describe("Card pool sync at the end of a draft", function () {
+	let client: Socket<ServerToClientEvents, ClientToServerEvents>;
+	const picked: UniqueCardID[] = [];
+	let firstBooster: UniqueCard[] = [];
+
+	beforeEach(function (done) {
+		disableLogs();
+		done();
+	});
+
+	afterEach(function (done) {
+		enableLogs(this.currentTest!.state === "failed");
+		done();
+	});
+
+	it("Client connects and starts a draft with bots.", function (done) {
+		client = makeClients([{ userID: "id1", sessionID: uuidv1(), userName: "Client1" }], () => {
+			client.emit("setBots", 7);
+			client.once("draftState", (s) => {
+				firstBooster = s.booster!;
+				done();
+			});
+			client.emit("startDraft", ackNoError);
+		})[0];
+	});
+
+	it("Receives its authoritative card pool when the draft ends.", function (done) {
+		client.once("endDraft", () => client.removeListener("draftState"));
+		client.once("syncCardPool", (pool) => {
+			expect(pool.main.map((c) => c.uniqueID)).to.have.members(picked);
+			expect(pool.main.length + pool.side.length).to.equal(picked.length);
+			done();
+		});
+		let pickNumber = 0;
+		client.on("draftState", (s) => {
+			if (s.boosterCount > 0 && s.booster && s.pickNumber !== pickNumber) {
+				pickNumber = s.pickNumber;
+				picked.push(s.booster[0].uniqueID);
+				client.emit("pickCard", { pickedCards: [0], burnedCards: [] }, ackNoError);
+			}
+		});
+		picked.push(firstBooster[0].uniqueID);
+		client.emit("pickCard", { pickedCards: [0], burnedCards: [] }, ackNoError);
+	});
+
+	it("Client should disconnect.", function (done) {
+		client.disconnect();
+		waitForClientDisconnects(() => done());
+	});
+});
+
 describe("Single Draft (Two Players)", function () {
 	let clients: ReturnType<typeof makeClients> = [];
 	let sessionID = "sessionID";
@@ -2565,7 +2616,7 @@ describe("Sealed", function () {
 });
 
 import { JumpstartBoosters, Jumpstart2022Boosters, JumpInSets, JumpInBoosters } from "../src/Jumpstart.js";
-import { Card, CardColor, CardID, DeckList, UniqueCard } from "../src/CardTypes.js";
+import { Card, CardColor, CardID, DeckList, UniqueCard, UniqueCardID } from "../src/CardTypes.js";
 import { SessionID, UserID } from "../src/IDTypes.js";
 import { SetCode } from "../src/Types.js";
 import { DraftState } from "../src/DraftState.js";
