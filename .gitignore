@@ -72,3 +72,7 @@ tmp
 
 # Ignore built ts files
 dist/**/*
+
+# Self-hosting (deploy/windows)
+logs
+.cloudflared-token
